@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% block title %}首页 | {{ app_name }}{% endblock %}
+
+{% block content %}
+<section class="panel fade-up tool-panel">
+  <!-- 右上角管理开关（显示删除按钮） -->
+  <div class="manage-hub">
+    <button class="manage-badge" type="button" title="管理工具" aria-label="管理工具" data-tip="管理工具">
+      <span class="sr-only">管理工具</span>
+    </button>
+  </div>
+  <div class="panel-header">
+    <div>
+      <h2>工具列表</h2>
+      <div class="muted">点击配置文件即可直接编辑工具的配置。</div>
+    </div>
+  </div>
+
+  <!-- 工具卡片列表 -->
+  <div class="tool-grid">
+    {% for tool in tools %}
+      <div class="panel tool-card">
+        <form method="post" action="{{ url_for('tool_delete', tool_id=tool.id) }}" class="delete-form">
+          <button class="delete-button" type="submit" title="删除 {{ tool.name }}" aria-label="删除 {{ tool.name }}">
+            <span class="sr-only">删除</span>
+          </button>
+        </form>
+        <div>
+          <h2>{{ tool.name }}</h2>
+          <div class="tool-meta">
+            <div>配置文件：</div>
+            <ul class="file-list">
+              {% for path in tool.config_files %}
+                <li><code>{{ path }}</code></li>
+              {% else %}
+                <li class="muted">未设置</li>
+              {% endfor %}
+            </ul>
+            <div>终端：{{ terminal_labels.get(tool.launch_terminal, tool.launch_terminal) }}</div>
+            <div>路径：<code>{{ tool.launch_path }}</code></div>
+            <div>命令：<span class="pill">{{ tool.launch_command }}</span></div>
+          </div>
+        </div>
+        <div class="card-footer">
+          <div class="card-actions">
+            <a class="button color-blue" href="{{ url_for('tool_configs', tool_id=tool.id) }}">配置文件</a>
+            <form method="post" action="{{ url_for('tool_launch', tool_id=tool.id) }}" class="action-form">
+              <button class="button color-green" type="submit">启动工具</button>
+            </form>
+            <a class="button color-red" href="{{ url_for('tool_edit', tool_id=tool.id) }}">编辑工具</a>
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+
+    <!-- 新增工具入口 -->
+    <a class="panel tool-card tool-add" href="{{ url_for('tool_new') }}">
+      <div class="add-card">
+        <div class="add-icon">+</div>
+        <div>新增工具</div>
+      </div>
+    </a>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(() => {
+  // 切换管理模式：显示/隐藏删除按钮
+  const hub = document.querySelector(".manage-hub");
+  if (!hub) {
+    return;
+  }
+  const badge = hub.querySelector(".manage-badge");
+  const panel = document.querySelector(".tool-panel");
+
+  badge.addEventListener("click", (event) => {
+    event.preventDefault();
+    if (panel) {
+      panel.classList.toggle("manage-on");
+    }
+  });
+})();
+</script>
+{% endblock %}

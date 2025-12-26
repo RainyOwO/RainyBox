@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+
+{% block title %}选择文件 | {{ app_name }}{% endblock %}
+
+{% block content %}
+<section class="panel fade-up">
+  <!-- 选择器标题与返回按钮 -->
+  <div class="panel-header">
+    <div>
+      <h2>{% if mode == 'dir' %}选择启动路径{% else %}选择配置文件{% endif %}</h2>
+      <div class="muted">当前目录：<code>{{ current }}</code></div>
+    </div>
+    <div class="button-row">
+      <button class="button tint-blue" type="button" id="back-button">返回</button>
+    </div>
+  </div>
+
+  <!-- 路径输入与快捷图标 -->
+  <form class="path-input-row {% if mode == 'dir' %}has-action{% endif %}" id="path-input-form">
+    <div class="path-icons">
+      {% if parent %}
+        <a class="icon-button" href="{{ url_for('browse_file', path=parent, mode=mode) }}" title="上一级">
+          <span aria-hidden="true">&#8592;</span>
+          <span class="sr-only">上一级</span>
+        </a>
+      {% endif %}
+      <a class="icon-button" href="{{ url_for('browse_file', path=home, mode=mode) }}" title="主目录">
+        <span aria-hidden="true">&#8962;</span>
+        <span class="sr-only">主目录</span>
+      </a>
+    </div>
+    <label class="path-input">
+      <span class="sr-only">路径</span>
+      <input type="text" id="path-input" value="{{ input_path }}" placeholder="输入路径后回车跳转">
+    </label>
+    {% if mode == 'dir' %}
+      <button class="button tint-green" type="button" id="select-dir">选择当前目录</button>
+    {% endif %}
+  </form>
+
+  <!-- 子目录列表 -->
+  <div class="panel fade-up" style="animation-delay: 0.05s;">
+    <h2>子目录</h2>
+    <ul class="dir-list">
+      {% for entry in dirs %}
+        <li class="dir-item">
+          <a href="{{ url_for('browse_file', path=entry, mode=mode) }}">{{ entry.name }}</a>
+          <span class="pill">{{ entry }}</span>
+        </li>
+      {% else %}
+        <li class="dir-item">
+          <span class="muted">未找到子目录。</span>
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  {% if mode == 'file' %}
+    <!-- 文件列表（仅 file 模式显示） -->
+    <div class="panel fade-up" style="animation-delay: 0.08s;">
+      <h2>文件</h2>
+      <ul class="dir-list file-listing">
+        {% for entry in files %}
+          <li class="dir-item file-item{% if selected_file and entry|string == selected_file %} is-selected{% endif %}">
+            <div class="file-info">
+              <div class="file-name">{{ entry.name }}</div>
+              <code class="file-path">{{ entry }}</code>
+            </div>
+            <button class="button tint-green" type="button" data-file="{{ entry }}">选择</button>
+          </li>
+        {% else %}
+          <li class="dir-item">
+            <span class="muted">当前目录没有文件。</span>
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+  {% endif %}
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(() => {
+  // 选择器交互：跳转路径、回传选择结果
+  const inputForm = document.getElementById("path-input-form");
+  const inputField = document.getElementById("path-input");
+  const buttons = document.querySelectorAll("[data-file]");
+  const backButton = document.getElementById("back-button");
+  const selectDirButton = document.getElementById("select-dir");
+  const mode = "{{ mode }}";
+  const currentPath = {{ current|string | tojson }};
+
+  const sendPath = (path) => {
+    if (!path) {
+      return;
+    }
+    if (window.opener && !window.opener.closed) {
+      const messageType = mode === "dir" ? "launch-path-picked" : "config-file-picked";
+      window.opener.postMessage({ type: messageType, path }, "*");
+      window.close();
+      return;
+    }
+    window.location.href = "{{ url_for('home') }}";
+  };
+
+  const navigateToPath = (path) => {
+    if (!path) {
+      return;
+    }
+    const url = new URL("{{ url_for('browse_file') }}", window.location.origin);
+    url.searchParams.set("path", path);
+    url.searchParams.set("mode", mode);
+    window.location.href = url.toString();
+  };
+
+  if (inputForm && inputField) {
+    inputForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      navigateToPath(inputField.value.trim());
+    });
+
+    inputField.addEventListener("change", () => {
+      navigateToPath(inputField.value.trim());
+    });
+  }
+
+  buttons.forEach((button) => {
+    button.addEventListener("click", () => {
+      const path = button.dataset.file;
+      sendPath(path);
+    });
+  });
+
+  if (selectDirButton) {
+    selectDirButton.addEventListener("click", () => {
+      sendPath(currentPath);
+    });
+  }
+
+  if (backButton) {
+    backButton.addEventListener("click", () => {
+      if (window.opener && !window.opener.closed) {
+        window.close();
+        return;
+      }
+      if (window.history.length > 1) {
+        window.history.back();
+        return;
+      }
+      window.location.href = "{{ url_for('home') }}";
+    });
+  }
+
+  const selected = document.querySelector(".file-item.is-selected");
+  if (selected) {
+    selected.scrollIntoView({ block: "center" });
+  }
+})();
+</script>
+{% endblock %}

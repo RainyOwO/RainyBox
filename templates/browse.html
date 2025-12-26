@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}目录浏览 | {{ app_name }}{% endblock %}
+
+{% block content %}
+<section class="panel fade-up">
+  <!-- 目录选择器 -->
+  <div class="panel-header">
+    <div>
+      <h2>选择目录</h2>
+      <div class="muted">当前目录：<code>{{ current }}</code></div>
+    </div>
+    <div class="button-row">
+      {% if parent %}
+        <a class="button tint-blue" href="{{ url_for('browse', path=parent, next=next_url) }}">上一级</a>
+      {% endif %}
+      <a class="button tint-blue" href="{{ url_for('browse', path=home, next=next_url) }}">主目录</a>
+      <a class="button tint-green" href="{{ select_url }}" id="select-current">选择当前目录</a>
+    </div>
+  </div>
+
+  <!-- 根目录快速入口 -->
+  <div class="data-list">
+    {% for root in roots %}
+      <a class="pill" href="{{ url_for('browse', path=root, next=next_url) }}">{{ root }}</a>
+    {% endfor %}
+  </div>
+
+  <!-- 子目录列表 -->
+  <div class="panel fade-up" style="animation-delay: 0.05s;">
+    <h2>子目录</h2>
+    <ul class="dir-list">
+      {% for entry in entries %}
+        <li class="dir-item">
+          <a href="{{ url_for('browse', path=entry, next=next_url) }}">{{ entry.name }}</a>
+          <span class="pill">{{ entry }}</span>
+        </li>
+      {% else %}
+        <li class="dir-item">
+          <span class="muted">未找到子目录。</span>
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(() => {
+  // 弹窗模式下回传当前目录给父窗口
+  const selectButton = document.getElementById("select-current");
+  if (!selectButton) {
+    return;
+  }
+  if (window.opener && !window.opener.closed) {
+    selectButton.addEventListener("click", (event) => {
+      event.preventDefault();
+      const path = {{ current|string | tojson }};
+      window.opener.postMessage({ type: "launch-path-picked", path }, "*");
+      window.close();
+    });
+  }
+})();
+</script>
+{% endblock %}

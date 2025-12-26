@@ -1,0 +1,225 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} | {{ app_name }}{% endblock %}
+
+{% block content %}
+<section class="panel fade-up">
+  <div class="panel-header">
+    <div>
+      <h2>{{ title }}</h2>
+      <div class="muted">使用文件选择器添加配置文件路径。</div>
+    </div>
+    <a class="button tint-blue" href="{{ url_for('home') }}">返回</a>
+  </div>
+
+  <!-- 表单校验提示 -->
+  {% if errors %}
+    <div class="messages">
+      {% for error in errors %}
+        <div class="message error">{{ error }}</div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <!-- 工具基础信息 -->
+  <form method="post" class="tool-form">
+    <div class="form-row">
+      <label>
+        工具名称
+        <input type="text" name="name" value="{{ data.name }}" required>
+      </label>
+      <label>
+        启动命令
+        <input type="text" name="launch_command" value="{{ data.launch_command }}" placeholder="可选">
+      </label>
+    </div>
+
+    <!-- 启动参数（可选） -->
+    <div class="form-row">
+      <label>
+        启动终端
+        <select name="launch_terminal">
+          {% for key, label in terminals %}
+            <option value="{{ key }}" {% if key == data.launch_terminal %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>
+        启动路径
+        <input type="text" id="launch-path-input" name="launch_path" value="{{ data.launch_path }}" placeholder="可选">
+      </label>
+      <button class="button tint-blue" type="button" id="launch-path-browse">浏览</button>
+    </div>
+
+    <!-- 配置文件列表（可增删/替换） -->
+    <div class="config-section">
+      <div class="config-header">
+        <div>
+          <div class="config-title">配置文件列表</div>
+          <div class="muted">可添加多个文件，支持重新选择或删除。</div>
+        </div>
+        <button class="button tint-blue" type="button" id="add-config">新增配置文件</button>
+      </div>
+      <div class="config-list" data-config-list>
+        {% if data.config_files %}
+          {% for path in data.config_files %}
+            <div class="config-item" data-path="{{ path }}">
+              <input type="hidden" name="config_files" value="{{ path }}">
+              <div class="config-path"><code>{{ path }}</code></div>
+              <div class="config-actions">
+                <button class="button tint-blue" type="button" data-action="replace">重新选择</button>
+                <button class="button tint-red" type="button" data-action="remove">删除</button>
+              </div>
+            </div>
+          {% endfor %}
+        {% else %}
+          <div class="config-empty muted">尚未添加配置文件。</div>
+        {% endif %}
+      </div>
+      <template id="config-item-template">
+        <div class="config-item" data-path="">
+          <input type="hidden" name="config_files" value="">
+          <div class="config-path"><code></code></div>
+          <div class="config-actions">
+            <button class="button tint-blue" type="button" data-action="replace">重新选择</button>
+            <button class="button tint-red" type="button" data-action="remove">删除</button>
+          </div>
+        </div>
+      </template>
+    </div>
+
+    <!-- 提交操作 -->
+    <div class="button-row">
+      <button class="button tint-green" type="submit">保存</button>
+      <a class="button tint-blue" href="{{ url_for('home') }}">取消</a>
+    </div>
+  </form>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(() => {
+  // 配置文件与启动路径选择器联动逻辑
+  const list = document.querySelector("[data-config-list]");
+  const addButton = document.getElementById("add-config");
+  const template = document.getElementById("config-item-template");
+  const launchBrowse = document.getElementById("launch-path-browse");
+  const launchInput = document.getElementById("launch-path-input");
+  const empty = list ? list.querySelector(".config-empty") : null;
+  let pendingReplace = null;
+
+  const updateEmpty = () => {
+    if (!list) {
+      return;
+    }
+    const hasItems = list.querySelectorAll(".config-item").length > 0;
+    if (empty) {
+      empty.style.display = hasItems ? "none" : "block";
+    }
+  };
+
+  const createItem = (path) => {
+    const node = template.content.firstElementChild.cloneNode(true);
+    node.dataset.path = path;
+    node.querySelector("code").textContent = path;
+    node.querySelector("input[name='config_files']").value = path;
+    return node;
+  };
+
+  const openFilePicker = (path) => {
+    const url = new URL("{{ url_for('browse_file') }}", window.location.origin);
+    if (path) {
+      url.searchParams.set("path", path);
+    }
+    window.open(url.toString(), "filePicker", "width=900,height=720");
+  };
+
+  const openLaunchPicker = () => {
+    const url = new URL("{{ url_for('browse_file') }}", window.location.origin);
+    const path = launchInput ? launchInput.value.trim() : "";
+    if (path) {
+      url.searchParams.set("path", path);
+    }
+    url.searchParams.set("mode", "dir");
+    const win = window.open(url.toString(), "pathPicker", "width=900,height=720");
+    if (!win) {
+      window.location.href = url.toString();
+    }
+  };
+
+  if (addButton && list && template) {
+    addButton.addEventListener("click", () => {
+      pendingReplace = null;
+      openFilePicker();
+    });
+
+    list.addEventListener("click", (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) {
+        return;
+      }
+      const action = target.dataset.action;
+      if (!action) {
+        return;
+      }
+      const item = target.closest(".config-item");
+      if (!item) {
+        return;
+      }
+      if (action === "remove") {
+        item.remove();
+        updateEmpty();
+        return;
+      }
+      if (action === "replace") {
+        pendingReplace = item;
+        openFilePicker(item.dataset.path);
+      }
+    });
+  }
+
+  if (launchBrowse) {
+    launchBrowse.addEventListener("click", () => {
+      openLaunchPicker();
+    });
+  }
+
+  window.addEventListener("message", (event) => {
+    const data = event.data;
+    if (!data) {
+      return;
+    }
+    if (data.type === "launch-path-picked") {
+      if (launchInput) {
+        launchInput.value = data.path || "";
+      }
+      return;
+    }
+    if (data.type !== "config-file-picked") {
+      return;
+    }
+    if (!list || !template) {
+      return;
+    }
+    const path = data.path;
+    if (!path) {
+      return;
+    }
+    if (pendingReplace) {
+      pendingReplace.dataset.path = path;
+      pendingReplace.querySelector("code").textContent = path;
+      pendingReplace.querySelector("input[name='config_files']").value = path;
+      pendingReplace = null;
+      updateEmpty();
+      return;
+    }
+    const item = createItem(path);
+    list.appendChild(item);
+    updateEmpty();
+  });
+
+  updateEmpty();
+})();
+</script>
+{% endblock %}

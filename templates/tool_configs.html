@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block title %}{{ tool.name }} 配置 | {{ app_name }}{% endblock %}
+
+{% block content %}
+<section class="panel fade-up">
+  <div class="panel-header">
+    <div>
+      <h2>{{ tool.name }} 配置文件</h2>
+      <div class="muted">每个文件可单独保存。</div>
+    </div>
+    <a class="button tint-blue" href="{{ url_for('home') }}">返回</a>
+  </div>
+
+  <!-- 多文件独立编辑 -->
+  {% if entries %}
+    {% for entry in entries %}
+      <form method="post" class="editor editor-block">
+        <input type="hidden" name="file_path" value="{{ entry.path }}">
+        <div class="panel-header">
+          <div>
+            <div class="path">{{ entry.path }}</div>
+            <div class="muted">
+              {% if entry.file_type == 'json' %}JSON{% elif entry.file_type == 'toml' %}TOML{% else %}文本{% endif %}
+              · {{ entry.abs_path }}
+            </div>
+          </div>
+          <button class="button tint-green" type="submit">保存</button>
+        </div>
+        {% if entry.error %}
+          <div class="message warning">{{ entry.error }}</div>
+        {% endif %}
+        <textarea name="content" rows="18" spellcheck="false">{{ entry.content }}</textarea>
+      </form>
+    {% endfor %}
+  {% else %}
+    <!-- 空状态提示 -->
+    <div class="muted">一个配置文件都没有加入管理，请先在工具编辑中添加。</div>
+  {% endif %}
+</section>
+{% endblock %}
