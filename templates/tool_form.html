@@ -107,7 +107,12 @@
   const launchBrowse = document.getElementById("launch-path-browse");
   const launchInput = document.getElementById("launch-path-input");
   const empty = list ? list.querySelector(".config-empty") : null;
-  let pendingReplace = null;
+  const pickerStorage = {
+    target: "rb_picker_target",
+    replacePath: "rb_picker_replace_path",
+    returnUrl: "rb_picker_return_url",
+    selectedPath: "rb_picker_selected_path",
+  };
 
   const updateEmpty = () => {
     if (!list) {
@@ -127,12 +132,89 @@
     return node;
   };
 
-  const openFilePicker = (path) => {
+  const setPickerState = (target, replacePath) => {
+    try {
+      sessionStorage.setItem(pickerStorage.target, target);
+      sessionStorage.setItem(pickerStorage.replacePath, replacePath || "");
+      sessionStorage.setItem(pickerStorage.returnUrl, window.location.href);
+    } catch (error) {
+      // Ignore storage errors and fall back to no-op.
+    }
+  };
+
+  const findItemByPath = (path) => {
+    if (!list) {
+      return null;
+    }
+    const items = list.querySelectorAll(".config-item");
+    for (const item of items) {
+      if (item.dataset.path === path) {
+        return item;
+      }
+    }
+    return null;
+  };
+
+  const applyConfigPath = (path, replacePath) => {
+    if (!list || !template || !path) {
+      return;
+    }
+    if (replacePath) {
+      const item = findItemByPath(replacePath);
+      if (item) {
+        item.dataset.path = path;
+        item.querySelector("code").textContent = path;
+        item.querySelector("input[name='config_files']").value = path;
+        updateEmpty();
+        return;
+      }
+    }
+    const item = createItem(path);
+    list.appendChild(item);
+    updateEmpty();
+  };
+
+  const consumePickerSelection = () => {
+    let pickedPath = null;
+    let target = null;
+    let replacePath = null;
+    try {
+      pickedPath = sessionStorage.getItem(pickerStorage.selectedPath);
+      if (!pickedPath) {
+        return;
+      }
+      target = sessionStorage.getItem(pickerStorage.target);
+      replacePath = sessionStorage.getItem(pickerStorage.replacePath);
+      sessionStorage.removeItem(pickerStorage.selectedPath);
+      sessionStorage.removeItem(pickerStorage.target);
+      sessionStorage.removeItem(pickerStorage.replacePath);
+      sessionStorage.removeItem(pickerStorage.returnUrl);
+    } catch (error) {
+      return;
+    }
+    if (!pickedPath || !target) {
+      return;
+    }
+    if (target === "launch-path") {
+      if (launchInput) {
+        launchInput.value = pickedPath;
+      }
+      return;
+    }
+    if (target === "config-replace") {
+      applyConfigPath(pickedPath, replacePath);
+      return;
+    }
+    applyConfigPath(pickedPath);
+  };
+
+  const openFilePicker = (path, target, replacePath) => {
     const url = new URL("{{ url_for('browse_file') }}", window.location.origin);
     if (path) {
       url.searchParams.set("path", path);
     }
-    window.open(url.toString(), "filePicker", "width=900,height=720");
+    setPickerState(target, replacePath);
+    window.location.href = url.toString();
   };
 
   const openLaunchPicker = () => {
@@ -142,16 +224,13 @@
       url.searchParams.set("path", path);
     }
     url.searchParams.set("mode", "dir");
-    const win = window.open(url.toString(), "pathPicker", "width=900,height=720");
-    if (!win) {
-      window.location.href = url.toString();
-    }
+    setPickerState("launch-path");
+    window.location.href = url.toString();
   };
 
   if (addButton && list && template) {
     addButton.addEventListener("click", () => {
-      pendingReplace = null;
-      openFilePicker();
+      openFilePicker("", "config-add");
     });
 
     list.addEventListener("click", (event) => {
@@ -173,8 +252,7 @@
         return;
       }
       if (action === "replace") {
-        pendingReplace = item;
-        openFilePicker(item.dataset.path);
+        openFilePicker(item.dataset.path, "config-replace", item.dataset.path);
       }
     });
   }
@@ -185,40 +263,11 @@
     });
   }
 
-  window.addEventListener("message", (event) => {
-    const data = event.data;
-    if (!data) {
-      return;
-    }
-    if (data.type === "launch-path-picked") {
-      if (launchInput) {
-        launchInput.value = data.path || "";
-      }
-      return;
-    }
-    if (data.type !== "config-file-picked") {
-      return;
-    }
-    if (!list || !template) {
-      return;
-    }
-    const path = data.path;
-    if (!path) {
-      return;
-    }
-    if (pendingReplace) {
-      pendingReplace.dataset.path = path;
-      pendingReplace.querySelector("code").textContent = path;
-      pendingReplace.querySelector("input[name='config_files']").value = path;
-      pendingReplace = null;
-      updateEmpty();
-      return;
-    }
-    const item = createItem(path);
-    list.appendChild(item);
-    updateEmpty();
+  window.addEventListener("pageshow", () => {
+    consumePickerSelection();
   });
 
+  consumePickerSelection();
   updateEmpty();
 })();
 </script>

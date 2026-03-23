@@ -37,6 +37,26 @@ Windows（CMD）：
 run.bat
 ```
 
+## 打包
+脚本会安装依赖与 PyInstaller、清理 `build/` 和 `dist/`，然后使用 `RainyBox.spec` 生成可执行文件。
+
+macOS：
+```bash
+./build.sh
+```
+
+Windows（PowerShell）：
+```powershell
+.\build.ps1
+```
+
+Windows（CMD）：
+```bat
+build.bat
+```
+
+打包产物位于 `dist/`。
+
 可选环境变量：
 - `PORT`（默认：8000）
 - `APP_DEBUG`（默认：1）

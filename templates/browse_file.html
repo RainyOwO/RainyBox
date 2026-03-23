@@ -90,15 +90,49 @@
   const selectDirButton = document.getElementById("select-dir");
   const mode = "{{ mode }}";
   const currentPath = {{ current|string | tojson }};
+  const pickerStorage = {
+    target: "rb_picker_target",
+    returnUrl: "rb_picker_return_url",
+    selectedPath: "rb_picker_selected_path",
+  };
+
+  const storeSelection = (path) => {
+    try {
+      const target = sessionStorage.getItem(pickerStorage.target);
+      if (!target) {
+        return false;
+      }
+      sessionStorage.setItem(pickerStorage.selectedPath, path);
+      return true;
+    } catch (error) {
+      return false;
+    }
+  };
+
+  const returnToSource = () => {
+    if (window.history.length > 1) {
+      window.history.back();
+      return;
+    }
+    let returnUrl = null;
+    try {
+      returnUrl = sessionStorage.getItem(pickerStorage.returnUrl);
+    } catch (error) {
+      returnUrl = null;
+    }
+    if (returnUrl) {
+      window.location.href = returnUrl;
+      return;
+    }
+    window.location.href = "{{ url_for('home') }}";
+  };
 
   const sendPath = (path) => {
     if (!path) {
       return;
     }
-    if (window.opener && !window.opener.closed) {
-      const messageType = mode === "dir" ? "launch-path-picked" : "config-file-picked";
-      window.opener.postMessage({ type: messageType, path }, "*");
-      window.close();
+    if (storeSelection(path)) {
+      returnToSource();
       return;
     }
     window.location.href = "{{ url_for('home') }}";
@@ -144,11 +178,7 @@
         window.close();
         return;
       }
-      if (window.history.length > 1) {
-        window.history.back();
-        return;
-      }
-      window.location.href = "{{ url_for('home') }}";
+      returnToSource();
     });
   }
 
